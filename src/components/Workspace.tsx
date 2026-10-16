@@ -9,6 +9,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   type Edge,
+  type OnSelectionChangeFunc,
   type ReactFlowInstance,
 } from "@xyflow/react";
 import {
@@ -99,6 +100,21 @@ export function Workspace({ projectId }: { projectId: string }) {
     client.setQueryData(key, next);
     void client.invalidateQueries({ queryKey: ["projects"] });
   }
+  // React Flow 把 onSelectionChange 放进 effect 依赖，回调必须保持稳定；
+  // 选择没变时也不能写入新数组，否则会触发渲染循环。
+  const onSelectionChange = useCallback<OnSelectionChangeFunc<FlowCard, Edge>>(
+    ({ nodes: selection }) => {
+      const ids = selection.map((n) => n.id);
+      selectedRef.current = ids;
+      setSelected((previous) =>
+        previous.length === ids.length &&
+        previous.every((value, index) => value === ids[index])
+          ? previous
+          : ids,
+      );
+    },
+    [],
+  );
   useEffect(() => {
     if (!w) return;
     setNodes((previous) =>
@@ -375,11 +391,7 @@ export function Workspace({ projectId }: { projectId: string }) {
                 })),
               ).catch(() => {});
             }}
-            onSelectionChange={({ nodes: selection }) => {
-              const ids = selection.map((n) => n.id);
-              selectedRef.current = ids;
-              setSelected(ids);
-            }}
+            onSelectionChange={onSelectionChange}
             onNodeDoubleClick={(_, node) =>
               setEditor(
                 wRef.current?.canvas.nodes.find((n) => n.id === node.id) ||

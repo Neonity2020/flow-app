@@ -27,6 +27,7 @@ Codex 当前版本通过 `initialize → initialized → thread/start → turn/s
 - 自动化测试覆盖批次原子性、范围越界、悬空关系、未知字段、修订冲突、请求去重、撤销重做、spec 过期覆盖与恢复、单任务锁、事件持久化、跨站写入、图片字节校验和项目隔离。
 - 本机已登录 Codex，真实握手与单轮生成 smoke test 通过。
 - 浏览器实测创建项目、编辑卡片、真实 AI 创建决策与问题卡片及连线、生成 spec、手工编辑保存。
+- 修复画布持续重渲染循环：`onSelectionChange` 回调身份不稳定导致 React Flow 的 `SelectionListener` effect 反复触发。修复后在真实浏览器回归「加载、空闲、添加卡片链接、选择与清除选择」均无 `Maximum update depth exceeded`；该场景尚无自动化测试覆盖。
 
 ## 当前限制与后续工作
 
