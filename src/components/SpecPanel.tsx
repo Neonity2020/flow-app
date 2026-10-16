@@ -30,6 +30,7 @@ export function SpecPanel({
   const [edit, setEdit] = useState(false);
   const [status, setStatus] = useState("已保存");
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [history, setHistory] = useState<
     { id: string; content: string; reason: string; createdAt: string }[] | null
   >(null);
@@ -100,6 +101,25 @@ export function SpecPanel({
       onClose();
     }
   }
+  async function exportSpec() {
+    setExporting(true);
+    try {
+      await save();
+      if (latest.current !== last.current) return;
+      const url = URL.createObjectURL(
+        new Blob([last.current], { type: "text/markdown;charset=utf-8" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "spec.md";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } finally {
+      setExporting(false);
+    }
+  }
   return (
     <section className="spec-panel">
       <div className="panel-heading">
@@ -137,14 +157,14 @@ export function SpecPanel({
           <History size={14} />
           恢复记录
         </button>
-        <a
+        <button
           className="secondary"
-          href={`/api/projects/${projectId}/export`}
-          download="spec.md"
+          disabled={exporting}
+          onClick={() => void exportSpec()}
         >
           <Download size={14} />
-          导出
-        </a>
+          {exporting ? "正在导出…" : "导出"}
+        </button>
         <span>{status}</span>
       </div>
       {spec.content && spec.sourceRevision !== projectRevision && (

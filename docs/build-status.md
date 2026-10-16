@@ -11,6 +11,7 @@
 - 本机 Codex stdio bridge、JSON Schema 输出、流式回复、操作校验、最多三次格式修正尝试、停止任务与重启中断恢复。
 - 底部 composer、右侧对话、选择范围、生成按钮。
 - 当前 spec 编辑、自动保存、生成前快照、恢复及 Markdown 导出。
+- spec 导出先等待当前编辑保存，下载本次保存内容；保存失败保留草稿并阻止下载旧版本。
 - 本机生产服务器与 Node-only 模块边界。
 
 ## 工程落地说明
@@ -28,6 +29,10 @@ Codex 当前版本通过 `initialize → initialized → thread/start → turn/s
 - 本机已登录 Codex，真实握手与单轮生成 smoke test 通过。
 - 浏览器实测创建项目、编辑卡片、真实 AI 创建决策与问题卡片及连线、生成 spec、手工编辑保存。
 - 修复画布持续重渲染循环：`onSelectionChange` 回调身份不稳定导致 React Flow 的 `SelectionListener` effect 反复触发。修复后在真实浏览器回归「加载、空闲、添加卡片链接、选择与清除选择」均无 `Maximum update depth exceeded`；该场景尚无自动化测试覆盖。
+- 2026-10-16 后续验证：`npm run typecheck`、`npm test`（10 项）、`npm run build` 通过；客户端产物检索未发现 `node:fs`、`node:child_process`、`node:sqlite`。
+- 新增独立 Node 进程重启集成测试：临时 `FLOW_DATA_DIR` 中的画布、对话、spec、恢复快照和事件持久化；重启后运行中任务变为 interrupted，允许新任务；恢复旧 spec 后可用自动快照恢复回更新版，另一项目保持隔离。
+- 隔离生产服务（端口 3101、临时数据目录）浏览器验证：输入后立即导出的 `spec.md` 包含完整最新文字；模拟其他标签页更新造成 revision 冲突后，导出显示保存失败，保留本地草稿。此导出交互尚无自动化浏览器测试覆盖。
+- 本轮重新运行 `npm run smoke:codex` 通过；该脚本验证真实 bridge 握手和单轮结构化输出，不覆盖 AI 工作流三次修正与取消清理。
 
 ## 当前限制与后续工作
 
