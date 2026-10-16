@@ -202,3 +202,50 @@ test("bridge failure preserves saved content and is not retried as an output for
   assert.equal(store.getSpec(s.id).content, "Saved spec");
   assert.equal(store.getWorkspace(s.id).messages.length, 1);
 });
+
+test("JSON syntax errors can be repaired before the third and final result", async () => {
+  const s = setup([
+    "{",
+    JSON.stringify({
+      content: "Bad operations",
+      operations: "not JSON",
+      spec: "",
+    }),
+    reply(),
+  ]);
+  startRun(s.id, s.runId, "chat", "help", []);
+  assert.equal((await finish(s)).status, "completed");
+  assert.equal(s.records().length, 3);
+  assert.deepEqual(
+    store.getWorkspace(s.id).messages.map((m) => m.content),
+    ["help", "Accepted"],
+  );
+});
+
+test("AI storage full fails once instead of asking the model to repair infrastructure", async () => {
+  const node = newCard();
+  node.body = "x".repeat(30000);
+  const s = setup([reply([{ type: "node.create", node }])], true);
+  startRun(s.id, s.runId, "chat", "help", []);
+  await until(s.records, (r) => r.length === 1);
+  const maximum = store.db.prepare("PRAGMA max_page_count").get()!
+    .max_page_count;
+  const pages = Number(store.db.prepare("PRAGMA page_count").get()!.page_count);
+  store.db.exec(`PRAGMA max_page_count=${pages + 1}`);
+  try {
+    s.release();
+    const run = await finish(s);
+    assert.equal(run.status, "failed");
+    assert.match(run.error || "", /空间不足/);
+    assert.equal(s.records().length, 1);
+    assert.equal(store.getWorkspace(s.id).project.revision, 0);
+    assert.equal(store.getWorkspace(s.id).canvas.nodes.length, 0);
+    assert.ok(
+      !store
+        .runEvents(s.id, s.runId, 0)
+        .some((e) => e.type === "operations.rejected"),
+    );
+  } finally {
+    store.db.exec(`PRAGMA max_page_count=${maximum}`);
+  }
+});

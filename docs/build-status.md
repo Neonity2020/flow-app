@@ -43,6 +43,10 @@ Codex 当前版本通过 `initialize → initialized → thread/start → turn/s
 - SSE 中断回归测试先复现失败：请求 AbortSignal 中断后流仍开放。修复后关闭该连接、移除中断监听和轮询定时器，保留后台任务；运行中断开、断开期间新增事件、按 Last-Event-ID 重连补齐通过。
 - 隔离生产服务（3102、模拟进程）浏览器验证运行中刷新：任务保持 running、仅一次 CLI 执行，放行结果后完成，刷新后仅一条用户消息和一条助手回复，控制台无 error/warn。
 - 本轮实际运行 `npm run typecheck`、`npm test`（20 项）、`npm run build`、`npm run smoke:codex` 和 `git diff --check` 全部通过；客户端产物无 `node:fs`、`node:child_process`、`node:sqlite`。浏览器隔离服务退出并删除临时数据目录。未重跑大画布基准，未验证磁盘满、真实网络故障或跨版本 CLI。
+- 存储故障后续：测试增至 28 项。SQLite 页数限制触发 FULL，复现并修复自动回滚后的二次 ROLLBACK 掩盖根因；验证 spec／快照、画布／历史／幂等请求原子回滚及恢复容量后重试。第二连接写锁、HTTP 507／503、AI 存储失败不请求格式修正均通过。
+- 未提交 SQLite 事务中实际 SIGKILL 子进程后重启：已提交画布、spec、消息与 revision 保留，未提交事件丢弃，任务 interrupted，完整性和外键检查通过。不是物理断电或活跃真实 Codex 服务强杀演练。
+- 隔离生产浏览器实测写锁造成 spec 保存失败、提示具体原因并保留草稿；释放锁后点击重试保存成功。方法与限制见[存储可靠性验收](storage-reliability.md)。
+- 本次存储改动实际运行 `npm run typecheck`、`npm test`（28 项）、`npm run build`、`npm run smoke:codex`、`git diff --check` 全部通过，客户端 Node-only 边界检查通过。浏览器测试写锁已释放，隔离服务和数据已清理；未重跑大画布基准或制造物理磁盘满、断电。
 
 ## 当前限制与后续工作
 
@@ -50,6 +54,6 @@ Codex 当前版本通过 `initialize → initialized → thread/start → turn/s
 - 用户编辑造成 AI 修订冲突时保留现状并报告失败，需要重新提交；不会自动重写用户内容。
 - 首版没有完整项目备份 UI；Markdown 导出只导出当前 spec。
 - 后续数据库升级需要在 migration 中补充升级前一致性备份；目前仅存在空库初始化 migration。
-- 断电、磁盘满、跨标签页持续并发，以及跨 Codex 版本兼容性仍需更深入的故障演练。
+- 数据库级容量限制、写锁和 SQLite 工作进程强杀已有自动化覆盖；物理磁盘满、断电、跨标签页持续并发，以及跨 Codex 版本兼容性仍需更深入的故障演练。物理磁盘完全不可写时，运行失败状态本身也可能无法持久化，需重启恢复。
 
 不应将本记录中的后续工作静默视为完成；继续实施时沿用 `implementation.md` 的验收编号。

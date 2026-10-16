@@ -8,6 +8,8 @@
 
 错误分类：`VALIDATION_ERROR`、`NOT_FOUND`、`REVISION_CONFLICT`、`RUN_ACTIVE`、`CODEX_UNAVAILABLE`、`CODEX_AUTH_REQUIRED`、`PROTOCOL_ERROR`、`STORAGE_ERROR`、`CANCELLED`。HTTP 承载时分别使用合适的 4xx/5xx 状态，领域错误仍保留 code。
 
+已实现的存储故障分类：SQLite FULL（含扩展错误码）、文件系统 ENOSPC／EDQUOT 返回 `STORAGE_FULL`（HTTP 507）；SQLite BUSY／LOCKED 返回 `STORAGE_BUSY`（HTTP 503）。提示释放数据盘空间或稍后重试，不向模型发送格式修正请求。数据库自动回滚后保留原始异常，不用重复 ROLLBACK 的异常覆盖根因。
+
 ## 服务能力
 
 | 能力 | 输入 | 结果 |

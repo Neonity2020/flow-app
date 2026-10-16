@@ -12,7 +12,7 @@
 
 - 工作区：`/Users/andi/Documents/ChatGPT/flow-app`
 - 分支：`main`
-- Git：已有初始提交、画布循环修复，以及 `f4978be`（Spec 导出保护和重启测试）。后续基准脚本、SSE 中断修复、验收文档和测试改动尚未提交；接手先运行 `git status --short`，保留已有修改。
+- Git：已有 `1f4d5f3`（SSE 中断清理、AI 故障与大画布验收）基线。本轮存储故障处理、测试和文档尚未提交；接手先运行 `git status --short`，保留已有修改。
 - PR / issue：无。
 - 运行中的本地服务：请实时检查端口和 PID，不依赖交接时记录。本轮浏览器验证使用端口 3101 与临时数据目录，不修改默认用户数据。
 - 本机验证数据：默认数据目录中有一个名为“Flow · 项目探索”的测试项目，包含 4 张卡片、AI 对话和生成的 spec。它不在仓库中，不应被测试或清理脚本修改。
@@ -63,7 +63,7 @@
 | 命令或检查 | 结果 | 证据 |
 | --- | --- | --- |
 | `npm run typecheck` | passed | TypeScript 无错误 |
-| `npm test` | passed | 20 tests，0 failed，含独立进程重启、大画布、AI 故障注入和 SSE 中断／增量重放 |
+| `npm test` | passed | 28 tests，0 failed，新增容量限制、写锁、API 错误、AI 存储失败不修正及事务中强杀恢复 |
 | `npm run build` | passed | client 与 SSR server 构建成功 |
 | `npm run smoke:codex` | passed | `initialize → initialized → thread/start → turn/start → completed` |
 | 浏览器创建项目和卡片 | passed | 项目与卡片保存，刷新后仍存在 |
@@ -78,13 +78,15 @@
 
 本轮新增 `tests/ai.test.ts` 与离线 `tests/fixtures/fake-codex.mjs`，通过 APP_CODEX_COMMAND 临时可执行文件模拟协议，不修改生产配置或使用真实凭据。覆盖修正成功／三次耗尽、请求去重、画布与 spec 冲突、取消及 failed 通知。`tests/stream.test.ts` 复现并保护 SSE 请求中断清理；修复位于 `src/server/api.ts`。隔离生产浏览器已验证运行中刷新、继续执行并收到唯一回复；模拟场景不等于真实网络故障演练。
 
+最新推进：`tests/storage-faults.test.ts` 用 SQLite 页数限制和第二连接写锁触发实际数据库故障；`transaction` 在数据库自动回滚后保留原始错误，`src/server/errors.ts` 将容量不足／占用转换成稳定错误码和中文建议。AI 只对模型输出问题修正，不对存储错误重试。新增未提交事务中 SIGKILL 恢复测试和浏览器保存失败→保留草稿→释放锁→重试成功回归。完整边界见 `docs/storage-reliability.md`。
+
 ## 尚未完成或未充分验证
 
 1. 修正成功和三次耗尽已有离线故障注入覆盖；真实网络断连、强杀、CLI 协议不兼容仍待演练，不将模拟结果视为跨版本兼容证据。
 2. 真实 AI 更新及浏览器恢复流程已在待办清单场景通过；“设计 Flow”同场景完整闭环仍未重跑。
 3. 200 卡片／300 连线首轮桌面功能验收和存储耗时基线已完成；浏览器 FPS、长任务、内存和指针响应延迟尚未测量，不能宣称所有设备流畅。
 4. 独立进程重启后运行中任务标记为 interrupted 已有集成测试；生产服务运行中强杀及浏览器断线重连仍需故障演练。
-5. 演练跨标签页持续编辑、磁盘满、进程强杀和 Codex 协议不兼容。
+5. 数据库级 FULL、写锁及 SQLite 未提交事务中强杀已有覆盖；仍需演练跨标签页持续编辑、物理磁盘满、真实 Codex 活跃时服务强杀和协议不兼容。
 6. 完整项目备份 UI、长上下文自动摘要、数据库升级 migration 及升级前一致性备份仍未实现。
 7. 视觉界面主要在 1440×900 桌面视口验证；移动端只做了 CSS 降级，没有完整交互验收。
 

@@ -57,7 +57,9 @@ export function transaction<T>(fn: () => T): T {
     db.exec("COMMIT");
     return result;
   } catch (error) {
-    db.exec("ROLLBACK");
+    // SQLITE_FULL can roll back the transaction itself. Preserve the original
+    // failure instead of replacing it with "no transaction is active".
+    if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
   }
 }

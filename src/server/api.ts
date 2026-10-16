@@ -6,6 +6,7 @@ import { AppError, operationSchema } from "../lib/model";
 import * as store from "./store";
 import { codexStatus } from "./codex";
 import { startRun, cancelRun } from "./ai";
+import { appError } from "./errors";
 const id = z.string().min(1).max(100);
 const revision = z.number().int().min(0);
 const json = (value: unknown) =>
@@ -268,14 +269,7 @@ export async function handle(request: Request): Promise<Response> {
         },
         { status: 400 },
       );
-    const error =
-      e instanceof AppError
-        ? e
-        : new AppError(
-            "INTERNAL_ERROR",
-            e instanceof Error ? e.message : "本地服务发生错误",
-            500,
-          );
+    const error = appError(e);
     return Response.json(
       { code: error.code, message: error.message },
       { status: error.status },

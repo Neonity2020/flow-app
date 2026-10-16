@@ -1,7 +1,8 @@
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { operationSchema, AppError } from "../lib/model";
 import * as store from "./store";
 import { runCodex, contentPrefix } from "./codex";
+import { appError } from "./errors";
 const globals = globalThis as typeof globalThis & {
   flowRuns?: Map<string, AbortController>;
   flowExitHook?: boolean;
@@ -119,12 +120,14 @@ export function startRun(
           store.addMessage(projectId, "assistant", reply.content, runId);
           break;
         } catch (error) {
-          // A concurrent user edit must never be overwritten by a blind retry.
-          if (
-            attempt === 2 ||
-            (error instanceof AppError && error.code === "REVISION_CONFLICT")
-          )
-            throw error;
+          // Only invalid model output can be repaired by another model call.
+          // Storage failures and concurrent edits need user action instead.
+          const repairable =
+            error instanceof ZodError ||
+            error instanceof SyntaxError ||
+            (error instanceof AppError &&
+              ["VALIDATION_ERROR", "NOT_FOUND"].includes(error.code));
+          if (attempt === 2 || !repairable) throw error;
           const details = error instanceof Error ? error.message : "格式错误";
           store.addEvent(runId, "operations.rejected", { message: details });
           store.addEvent(runId, "message.reset", {});
@@ -133,7 +136,7 @@ export function startRun(
       }
       store.finishRun(projectId, runId, "completed");
     } catch (e) {
-      const error = e instanceof Error ? e.message : "AI 运行失败";
+      const error = appError(e).message;
       try {
         store.finishRun(
           projectId,
