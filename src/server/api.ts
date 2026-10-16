@@ -54,10 +54,27 @@ export async function handle(request: Request): Promise<Response> {
         throw new AppError("VALIDATION_ERROR", "事件序号无效");
       store.getRun(projectId, runId);
       const encoder = new TextEncoder();
-      let timer: ReturnType<typeof setInterval> | undefined;
-      let stopped = false;
+      let cleanup = () => {};
       const stream = new ReadableStream({
         start(controller) {
+          let timer: ReturnType<typeof setInterval> | undefined;
+          let stopped = false;
+          function stop() {
+            stopped = true;
+            clearInterval(timer);
+            request.signal.removeEventListener("abort", close);
+          }
+          function close() {
+            if (stopped) return;
+            stop();
+            controller.close();
+          }
+          cleanup = stop;
+          request.signal.addEventListener("abort", close, { once: true });
+          if (request.signal.aborted) {
+            close();
+            return;
+          }
           function tick() {
             if (stopped) return;
             try {
@@ -70,22 +87,17 @@ export async function handle(request: Request): Promise<Response> {
                 after = event.sequence;
               }
               if (store.getRun(projectId, runId).status !== "running") {
-                stopped = true;
-                clearInterval(timer);
-                controller.close();
+                close();
               }
             } catch {
-              stopped = true;
-              clearInterval(timer);
-              controller.close();
+              close();
             }
           }
           timer = setInterval(tick, 250);
           tick();
         },
         cancel() {
-          stopped = true;
-          clearInterval(timer);
+          cleanup();
         },
       });
       return new Response(stream, {

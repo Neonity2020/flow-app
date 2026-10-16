@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { newCard } from "../src/lib/model";
+import { canvasFixture, fixtureOperations } from "../scripts/canvas-fixture";
 const directory = mkdtempSync(join(tmpdir(), "flow-test-"));
 process.env.FLOW_DATA_DIR = directory;
 const s = await import("../src/server/store");
@@ -72,4 +73,38 @@ test("single AI run, persisted events and repeat start do not duplicate messages
   s.finishRun("p3", "r1", "cancelled");
   s.beginRun("p3", "r2", "chat", "again");
   assert.equal(s.getWorkspace("p3").run?.id, "r2");
+});
+
+test("200 cards and 300 edges preserve group move and deletion undo as atomic batches", () => {
+  const canvas = canvasFixture();
+  s.createProject("large canvas", "large");
+  s.applyOperations("large", "large-seed", 0, fixtureOperations(canvas));
+  assert.deepEqual(s.getWorkspace("large").canvas, canvas);
+  const moved = s.applyOperations("large", "group-move", 1, [
+    { type: "node.update", id: "card-105", patch: { x: 1488, y: 1848 } },
+    { type: "node.update", id: "card-106", patch: { x: 1848, y: 1848 } },
+  ]);
+  assert.equal(moved.project.revision, 2);
+  assert.equal(moved.canvas.nodes[104].x, 1488);
+  assert.equal(moved.canvas.nodes[105].x, 1848);
+  s.travel("large", "undo", 2);
+  assert.deepEqual(s.getWorkspace("large").canvas, canvas);
+  s.travel("large", "redo", 3);
+  assert.deepEqual(s.getWorkspace("large").canvas, moved.canvas);
+  const deleted = s.applyOperations("large", "group-delete", 4, [
+    { type: "node.delete", id: "card-105" },
+    { type: "node.delete", id: "card-106" },
+  ]);
+  assert.equal(deleted.canvas.nodes.length, 198);
+  assert.ok(deleted.canvas.edges.length < 300);
+  assert.ok(
+    deleted.canvas.edges.every(
+      (e) =>
+        ![e.source, e.target].some(
+          (id) => id === "card-105" || id === "card-106",
+        ),
+    ),
+  );
+  s.travel("large", "undo", 5);
+  assert.deepEqual(s.getWorkspace("large").canvas, moved.canvas);
 });

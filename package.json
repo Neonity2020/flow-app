@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "start": "node scripts/serve.mjs",
-    "smoke:codex": "tsx scripts/smoke-codex.ts"
+    "smoke:codex": "tsx scripts/smoke-codex.ts",
+    "bench:canvas": "npm run build && tsx scripts/bench-canvas.ts"
   },
   "keywords": [],
   "author": "",
